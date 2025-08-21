@@ -1,19 +1,23 @@
 "use client";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, MapPin, Plane, Hotel, Calendar, Clock, AlertCircle, Star, ArrowRight, Filter, Eye, DollarSign, Navigation, Globe, ThumbsUp, ThumbsDown, Edit, BookOpen, MessageCircle } from "lucide-react";
+import { Search, MapPin, Plane, Hotel, Calendar, Clock, AlertCircle, Star, ArrowRight, Filter, Eye, DollarSign, Navigation, ThumbsUp, ThumbsDown, Edit, BookOpen, MessageCircle } from "lucide-react";
 import ConversationBubble, { OptionButton } from "@/components/ConversationBubble";
 import DestinationCard from "@/components/DestinationCard";
 import Itinerary from "@/components/Itinerary";
 import type { TPlanResponse } from "@/lib/schema";
 
-type ConversationStep = "start" | "location" | "distance_preference" | "planning" | "options" | "destinations" | "destinations_feedback" | "filters" | "flight_dates" | "flight_preference" | "itinerary" | "itinerary_feedback" | "modify_itinerary" | "booking_options" | "flights" | "hotels";
+type ConversationStep = "start" | "location" | "planning" | "options" | "destinations" | "destinations_feedback" | "filters" | "flight_dates" | "flight_preference" | "itinerary" | "itinerary_feedback" | "modify_itinerary" | "booking_options" | "flights" | "hotels";
 
 export default function Home() {
   const [input, setInput] = useState("");
   const [userLocation, setUserLocation] = useState("");
-  const [distancePreference, setDistancePreference] = useState<"nearby" | "faraway" | "both" | null>(null);
   const [loading, setLoading] = useState(false);
+  
+  // Refs for auto-scrolling and focusing
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const startDateRef = useRef<HTMLInputElement>(null);
+  const endDateRef = useRef<HTMLInputElement>(null);
   const [plan, setPlan] = useState<TPlanResponse | null>(null);
   const [currentStep, setCurrentStep] = useState<ConversationStep>("start");
   const [error, setError] = useState<string | null>(null);
@@ -25,8 +29,24 @@ export default function Home() {
   const [modificationText, setModificationText] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [tripDuration, setTripDuration] = useState<number>(3); // Store calculated duration
   const [flightPreference, setFlightPreference] = useState<"cheapest" | "good_timing" | null>(null);
   const [flights, setFlights] = useState<any[]>([]);
+
+  // Auto-scroll and focus when date fields appear
+  useEffect(() => {
+    if (currentStep === "flight_dates") {
+      // Scroll to bottom of chat and focus on start date
+      setTimeout(() => {
+        if (chatContainerRef.current) {
+          chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+        }
+        if (startDateRef.current) {
+          startDateRef.current.focus();
+        }
+      }, 100);
+    }
+  }, [currentStep]);
 
   async function generate() {
     if (!input.trim() || !userLocation.trim()) return;
@@ -40,12 +60,8 @@ export default function Home() {
     setCurrentStep("planning");
     
     try {
-      // Enhanced prompt with location and distance preference
-      const enhancedPrompt = `${input}. I'm traveling from ${userLocation}. ${
-        distancePreference === "nearby" ? "I prefer nearby destinations within India." :
-        distancePreference === "faraway" ? "I'm interested in exploring faraway places, international destinations are welcome." :
-        "I'm open to both nearby and faraway destinations."
-      }`;
+      // Enhanced prompt with location
+      const enhancedPrompt = `${input}. I'm traveling from ${userLocation}.`;
 
       const res = await fetch("/api/plan", {
         method: "POST",
@@ -94,32 +110,17 @@ export default function Home() {
       return;
     }
     
-    setCurrentStep("distance_preference");
+    setCurrentStep("location");
     addToConversation('user', `I'm starting my dreamcation from ${userLocation}`);
     addToConversation('bot', 
       <div className="space-y-3">
         <p>Perfect! <strong>{userLocation}</strong> is an amazing starting point! ✈️</p>
-        <p>Quick question - are you in the mood for nearby gems or faraway adventures?</p>
+        <p>Now tell me about your dream vacation!</p>
       </div>
     );
   }
 
-  function handleDistancePreference(preference: "nearby" | "faraway" | "both") {
-    setDistancePreference(preference);
-    const preferenceText = preference === "nearby" ? "nearby destinations" : 
-                          preference === "faraway" ? "faraway adventures" : "both nearby and faraway options";
-    
-    addToConversation('user', `I prefer ${preferenceText}`);
-    addToConversation('bot', 
-      <div className="space-y-2">
-        <p>Excellent! {preference === "nearby" ? "So much beauty to discover closer to home! 🏖️" : 
-                      preference === "faraway" ? "Love the adventurous spirit! International destinations coming up! 🌏" :
-                      "Perfect! Best of both worlds! 🌎"}</p>
-        <p>Now describe your dream vacation!</p>
-      </div>
-    );
-    setCurrentStep("location");
-  }
+
 
   function selectDestination(name: string) {
     if (!plan) return;
@@ -236,6 +237,9 @@ export default function Home() {
       return;
     }
     
+    // Store the calculated duration
+    setTripDuration(days);
+    
     addToConversation('user', `I want to travel from ${startDate} to ${endDate}`);
     addToConversation('bot', 
       <div className="space-y-2">
@@ -266,6 +270,7 @@ export default function Home() {
   async function searchFlights() {
     setLoading(true);
     try {
+      // First, search for flights
       const response = await fetch('/api/flights', {
         method: 'POST',
         headers: {
@@ -283,10 +288,31 @@ export default function Home() {
       const flightData = await response.json();
       setFlights(flightData.flights || []);
       
+      // Now regenerate the itinerary with the correct duration
+      if (plan?.chosenDestination) {
+        const updatedPrompt = `Create a detailed ${tripDuration}-day itinerary for ${plan.chosenDestination}. I'm traveling from ${userLocation} from ${new Date(startDate).toLocaleDateString()} to ${new Date(endDate).toLocaleDateString()}. ${input}`;
+        
+        const planResponse = await fetch("/api/plan", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: updatedPrompt })
+        });
+        
+        if (planResponse.ok) {
+          const updatedPlan = await planResponse.json();
+          // Update the plan with correct duration and itinerary
+          setPlan({
+            ...plan,
+            durationDays: tripDuration,
+            itinerary: updatedPlan.itinerary || plan.itinerary
+          });
+        }
+      }
+      
       addToConversation('bot', 
         <div className="space-y-2">
-          <p>Found amazing flight options for you! ✈️</p>
-          <p>Here's your complete itinerary with flights:</p>
+          <p>Found amazing {flightPreference === "cheapest" ? "budget-friendly" : "well-timed"} flight options for you! ✈️</p>
+          <p>Here's your complete {tripDuration}-day itinerary with the best flights for your preference:</p>
         </div>
       );
       
@@ -298,7 +324,10 @@ export default function Home() {
     } catch (error) {
       console.error('Error searching flights:', error);
       addToConversation('bot', 
-        <p>I'll show you the itinerary while I continue searching for the best flights! 🛫</p>
+        <div className="space-y-2">
+          <p>I'll show you the {tripDuration}-day itinerary while I continue searching for the best {flightPreference === "cheapest" ? "budget-friendly" : "well-timed"} flights! 🛫</p>
+          <p className="text-sm text-gray-600">Flight search is taking longer than expected, but I'll keep looking for great options.</p>
+        </div>
       );
       setCurrentStep("itinerary");
       setTimeout(() => showItineraryFeedback(), 3000);
@@ -512,25 +541,30 @@ export default function Home() {
                      </motion.div>
                    )}
 
-                   {/* Flights Display */}
-                   {(currentStep === "flights" || (currentStep === "itinerary" && flights.length > 0)) && (
-                     <motion.div 
-                       initial={{ opacity: 0, y: 30 }}
-                       animate={{ opacity: 1, y: 0 }}
-                       transition={{ duration: 0.6 }}
-                     >
-                       <div className="text-center mb-6">
-                         <h3 className="text-xl font-bold text-gray-800 mb-2">
-                           {flightPreference === "cheapest" ? "Cheapest Flight Options" : "Best Timed Flights"}
-                         </h3>
-                         <p className="text-gray-600">
-                           From {userLocation} to {plan?.chosenDestination} | {startDate} to {endDate}
-                         </p>
-                       </div>
+                                      {/* Flights Display */}
+                  {(currentStep === "flights" || (currentStep === "itinerary" && flights.length > 0)) && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 30 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.6 }}
+                    >
+                      <div className="text-center mb-6">
+                        <h3 className="text-xl font-bold text-gray-800 mb-2">
+                          {flightPreference === "cheapest" ? "💰 Cheapest Flight Options" : "⏰ Best Timed Flights"}
+                        </h3>
+                        <p className="text-gray-600">
+                          From {userLocation} to {plan?.chosenDestination} | {startDate && endDate ? `${new Date(startDate).toLocaleDateString()} to ${new Date(endDate).toLocaleDateString()}` : 'Dates TBD'}
+                        </p>
+                        {flightPreference && (
+                          <div className="inline-flex items-center gap-2 bg-orange-100 text-orange-800 px-3 py-1 rounded-full text-sm mt-2">
+                            {flightPreference === "cheapest" ? "💰 Budget Priority" : "⏰ Timing Priority"}
+                          </div>
+                        )}
+                      </div>
 
                        <div className="space-y-4">
                          {flights.length ? flights.map((flight, i) => (
-                           <div key={flight.id || i} className="bg-white rounded-xl p-6 shadow-md border border-gray-200">
+                           <div key={flight.id || i} className="bg-white rounded-xl p-6 shadow-md border border-gray-200 hover:shadow-lg transition-shadow">
                              <div className="flex justify-between items-start">
                                <div className="flex-1">
                                  <div className="flex items-center gap-4 mb-4">
@@ -541,11 +575,23 @@ export default function Home() {
                                      <div className="font-semibold text-gray-800 text-lg">{flight.airline}</div>
                                      <div className="text-sm text-gray-600">{flight.flightNumber}</div>
                                    </div>
-                                   {flight.stops === 0 && (
-                                     <div className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
-                                       Non-stop
-                                     </div>
-                                   )}
+                                   <div className="flex gap-2">
+                                     {flight.stops === 0 && (
+                                       <div className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
+                                         Non-stop
+                                       </div>
+                                     )}
+                                     {i === 0 && flightPreference === "cheapest" && (
+                                       <div className="bg-orange-100 text-orange-800 text-xs px-2 py-1 rounded-full">
+                                         💰 Best Price
+                                       </div>
+                                     )}
+                                     {i === 0 && flightPreference === "good_timing" && (
+                                       <div className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
+                                         ⏰ Best Timing
+                                       </div>
+                                     )}
+                                   </div>
                                  </div>
                                  
                                  <div className="grid grid-cols-1 gap-4">
@@ -590,8 +636,11 @@ export default function Home() {
                          )) : (
                            <div className="text-center py-12 text-gray-500">
                              <Plane className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                             <p className="text-lg">Searching for the best flights...</p>
-                             <p className="text-sm">This may take a moment</p>
+                             <p className="text-lg">Searching for the best {flightPreference === "cheapest" ? "budget-friendly" : "well-timed"} flights...</p>
+                             <p className="text-sm">Checking {flightPreference === "cheapest" ? "cheapest options" : "flights with good timing"} from {userLocation} to {plan?.chosenDestination}</p>
+                             <div className="mt-4">
+                               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto"></div>
+                             </div>
                            </div>
                          )}
                        </div>
@@ -699,8 +748,8 @@ export default function Home() {
                  </div>
                </div>
 
-               {/* Chat Messages */}
-               <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                              {/* Chat Messages */}
+              <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-6 space-y-6">
                  {conversationHistory.map((message, index) => (
                    <ConversationBubble key={index} isBot={message.type === 'bot'}>
                      {message.content}
@@ -732,9 +781,9 @@ export default function Home() {
                        />
                      </div>
                      
-                     <div className="text-sm text-gray-500 bg-white rounded-xl p-3 text-center border">
-                       📍 From: <strong>{userLocation}</strong> • 🌍 Preference: <strong>{distancePreference === "nearby" ? "Nearby destinations" : distancePreference === "faraway" ? "Faraway adventures" : "Both options"}</strong>
-                     </div>
+                                         <div className="text-sm text-gray-500 bg-white rounded-xl p-3 text-center border">
+                      📍 From: <strong>{userLocation}</strong>
+                    </div>
                      
                      <button 
                        disabled={loading || !input.trim() || input.trim().length < 15} 
@@ -799,64 +848,91 @@ export default function Home() {
                    </div>
                  )}
 
-                 {/* Flight Date Selection */}
-                 {currentStep === "flight_dates" && (
-                   <div className="space-y-4">
-                     <div className="grid grid-cols-2 gap-4">
-                       <div>
-                         <label className="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
-                         <div className="relative">
-                           <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                           <input 
-                             type="date"
-                             className="w-full pl-10 pr-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-gray-700"
-                             value={startDate} 
-                             onChange={e=>setStartDate(e.target.value)}
-                             min={new Date().toISOString().split('T')[0]}
-                           />
-                         </div>
-                       </div>
-                       
-                       <div>
-                         <label className="block text-sm font-medium text-gray-700 mb-2">End Date</label>
-                         <div className="relative">
-                           <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                           <input 
-                             type="date"
-                             className="w-full pl-10 pr-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-gray-700"
-                             value={endDate} 
-                             onChange={e=>setEndDate(e.target.value)}
-                             min={startDate || new Date().toISOString().split('T')[0]}
-                           />
-                         </div>
-                       </div>
-                     </div>
-                     
-                     <button 
-                       disabled={!startDate || !endDate} 
-                       onClick={handleDateSubmit}
-                       className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white py-4 px-6 rounded-2xl font-semibold text-lg disabled:opacity-50 hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2"
-                     >
-                       <Calendar className="w-5 h-5" />
-                       Confirm Travel Dates
-                     </button>
-                   </div>
-                 )}
+                                 {/* Flight Date Selection */}
+                {currentStep === "flight_dates" && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="space-y-6 bg-gradient-to-br from-orange-50 to-red-50 p-6 rounded-2xl border border-orange-200"
+                  >
+                    <div className="text-center">
+                      <h3 className="text-lg font-bold text-gray-800 mb-2">📅 Select Your Travel Dates</h3>
+                      <p className="text-sm text-gray-600">Choose when you'd like to embark on your adventure!</p>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-3">
+                          <Calendar className="w-4 h-4 inline mr-2 text-orange-500" />
+                          Departure Date
+                        </label>
+                        <div className="relative">
+                          <input 
+                            ref={startDateRef}
+                            type="date"
+                            className="w-full px-4 py-4 border-2 border-orange-200 rounded-xl focus:ring-3 focus:ring-orange-200 focus:border-orange-500 text-gray-700 text-lg bg-white shadow-sm transition-all duration-200 hover:border-orange-300"
+                            value={startDate} 
+                            onChange={e=>setStartDate(e.target.value)}
+                            min={new Date().toISOString().split('T')[0]}
+                            placeholder="Select departure date"
+                          />
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-3">
+                          <Calendar className="w-4 h-4 inline mr-2 text-orange-500" />
+                          Return Date
+                        </label>
+                        <div className="relative">
+                          <input 
+                            ref={endDateRef}
+                            type="date"
+                            className="w-full px-4 py-4 border-2 border-orange-200 rounded-xl focus:ring-3 focus:ring-orange-200 focus:border-orange-500 text-gray-700 text-lg bg-white shadow-sm transition-all duration-200 hover:border-orange-300"
+                            value={endDate} 
+                            onChange={e=>{
+                              setEndDate(e.target.value);
+                              // Auto-focus next field logic could go here
+                            }}
+                            min={startDate || new Date().toISOString().split('T')[0]}
+                            placeholder="Select return date"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {startDate && endDate && (
+                      <motion.div 
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="bg-white p-4 rounded-xl border border-orange-200 text-center"
+                      >
+                        <p className="text-sm text-gray-600">
+                          <strong className="text-orange-600">
+                            {Math.ceil((new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24))} days
+                          </strong> of amazing adventure!
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {new Date(startDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} 
+                          {' → '}
+                          {new Date(endDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                        </p>
+                      </motion.div>
+                    )}
+                    
+                    <button 
+                      disabled={!startDate || !endDate} 
+                      onClick={handleDateSubmit}
+                      className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white py-4 px-6 rounded-2xl font-semibold text-lg disabled:opacity-50 hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2 disabled:cursor-not-allowed"
+                    >
+                      <Calendar className="w-5 h-5" />
+                      {!startDate || !endDate ? 'Please Select Both Dates' : 'Confirm Travel Dates'}
+                    </button>
+                  </motion.div>
+                )}
 
-                 {/* Action Options */}
-                 {currentStep === "distance_preference" && (
-                   <div className="flex gap-2 justify-center overflow-x-auto pb-2">
-                     <OptionButton onClick={() => handleDistancePreference("nearby")} icon={<MapPin className="w-4 h-4" />}>
-                       Nearby Destinations
-                     </OptionButton>
-                     <OptionButton onClick={() => handleDistancePreference("faraway")} icon={<Globe className="w-4 h-4" />}>
-                       Faraway Adventures
-                     </OptionButton>
-                     <OptionButton onClick={() => handleDistancePreference("both")} icon={<Search className="w-4 h-4" />}>
-                       Show Me Both
-                     </OptionButton>
-                   </div>
-                 )}
+                                 {/* Action Options */}
 
                  {currentStep === "options" && plan && (
                    <div className="flex gap-2 justify-center overflow-x-auto pb-2">
@@ -866,37 +942,44 @@ export default function Home() {
                      <OptionButton onClick={showFilters} icon={<Filter className="w-4 h-4" />}>
                        Filter Options
                      </OptionButton>
-                     <OptionButton onClick={() => {
-                       addToConversation('user', "Show me flights and hotels");
-                       addToConversation('bot', 
-                         <p>Here are the best flights from <strong>{userLocation}</strong> and hotel options! ✈️🏨</p>
-                       );
-                       setCurrentStep("flights");
-                     }} icon={<Plane className="w-4 h-4" />}>
-                       View Flights & Hotels
-                     </OptionButton>
+                                         <OptionButton onClick={() => {
+                      addToConversation('user', "I want to change my vacation plans");
+                      addToConversation('bot', 
+                        <div className="space-y-2">
+                          <p>No problem at all! Let's adjust your dream vacation! ✨</p>
+                          <p>I've pre-filled your previous description so you can easily modify it. What would you like to change about your trip from <strong>{userLocation}</strong>?</p>
+                        </div>
+                      );
+                      setCurrentStep("location");
+                      // Keep the previous input so they can edit it
+                    }} icon={<Edit className="w-4 h-4" />}>
+                      Change of Plans
+                    </OptionButton>
                    </div>
                  )}
 
-                 {currentStep === "destinations_feedback" && plan && (
-                   <div className="flex gap-2 justify-center overflow-x-auto pb-2">
-                     <OptionButton onClick={() => handleDestinationsFeedback(true)} icon={<ThumbsUp className="w-4 h-4" />}>
-                       I Love These Options!
-                     </OptionButton>
-                     <OptionButton onClick={() => handleDestinationsFeedback(false)} icon={<Search className="w-4 h-4" />}>
-                       Show Me Different Places
-                     </OptionButton>
-                     <OptionButton onClick={() => {
-                       addToConversation('user', "Tell me more about these destinations");
-                       addToConversation('bot', 
-                         <p>I'd love to share more details! Click on any destination card to see full itineraries, or use the filter options to find exactly what you're looking for! 📋</p>
-                       );
-                       setCurrentStep("destinations");
-                     }} icon={<Eye className="w-4 h-4" />}>
-                       Tell Me More
-                     </OptionButton>
-                   </div>
-                 )}
+                                 {currentStep === "destinations_feedback" && plan && (
+                  <div className="flex gap-2 justify-center overflow-x-auto pb-2">
+                    <OptionButton onClick={() => handleDestinationsFeedback(true)} icon={<ThumbsUp className="w-4 h-4" />}>
+                      I Love These Options!
+                    </OptionButton>
+                    <OptionButton onClick={() => handleDestinationsFeedback(false)} icon={<Search className="w-4 h-4" />}>
+                      Show Me Different Places
+                    </OptionButton>
+                    <OptionButton onClick={() => {
+                      addToConversation('user', "I want to change my vacation plans");
+                      addToConversation('bot', 
+                        <div className="space-y-2">
+                          <p>Of course! Let's adjust your dream vacation! ✨</p>
+                          <p>I've pre-filled your previous description so you can easily modify it.</p>
+                        </div>
+                      );
+                      setCurrentStep("location");
+                    }} icon={<Edit className="w-4 h-4" />}>
+                      Change of Plans
+                    </OptionButton>
+                  </div>
+                )}
 
                  {currentStep === "flight_preference" && (
                    <div className="flex gap-2 justify-center overflow-x-auto pb-2">
@@ -928,17 +1011,38 @@ export default function Home() {
                    </div>
                  )}
 
-                 {currentStep === "booking_options" && plan && (
-                   <div className="flex gap-2 justify-center overflow-x-auto pb-2">
-                     <OptionButton onClick={() => {
-                       addToConversation('user', "Book flights");
-                       addToConversation('bot', 
-                         <p>Perfect! Here are the best flight options from <strong>{userLocation}</strong> to <strong>{plan.chosenDestination}</strong>! ✈️</p>
-                       );
-                       setCurrentStep("flights");
-                     }} icon={<Plane className="w-4 h-4" />}>
-                       Book Flights
-                     </OptionButton>
+                                 {currentStep === "booking_options" && plan && (
+                  <div className="flex gap-2 justify-center overflow-x-auto pb-2">
+                    <OptionButton onClick={async () => {
+                      addToConversation('user', "Book flights");
+                      addToConversation('bot', 
+                        <div className="space-y-2">
+                          <p>Perfect! Let me search for the best {flightPreference === "cheapest" ? "budget-friendly" : "well-timed"} flights from <strong>{userLocation}</strong> to <strong>{plan.chosenDestination}</strong>! ✈️</p>
+                          <p>Searching based on your preference for {flightPreference === "cheapest" ? "cheapest flights" : "good timing flights"}...</p>
+                        </div>
+                      );
+                      
+                      // Ensure we have all required information
+                      if (!startDate || !endDate) {
+                        addToConversation('bot', 
+                          <p>I need your travel dates first! When would you like to travel?</p>
+                        );
+                        setCurrentStep("flight_dates");
+                      } else if (!flightPreference) {
+                        addToConversation('bot', 
+                          <div className="space-y-2">
+                            <p>I need to know your flight preference first!</p>
+                            <p>What's more important to you for your flights?</p>
+                          </div>
+                        );
+                        setCurrentStep("flight_preference");
+                      } else {
+                        // Call the actual flight search API
+                        await searchFlights();
+                      }
+                    }} icon={<Plane className="w-4 h-4" />}>
+                      Book Flights
+                    </OptionButton>
                      <OptionButton onClick={() => {
                        addToConversation('user', "Book hotels");
                        addToConversation('bot', 
