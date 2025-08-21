@@ -7,7 +7,7 @@ import DestinationCard from "@/components/DestinationCard";
 import Itinerary from "@/components/Itinerary";
 import type { TPlanResponse } from "@/lib/schema";
 
-type ConversationStep = "start" | "location" | "planning" | "options" | "destinations" | "destinations_feedback" | "filters" | "flight_dates" | "flight_preference" | "itinerary" | "itinerary_feedback" | "modify_itinerary" | "booking_options" | "flights" | "hotels";
+type ConversationStep = "start" | "location" | "planning" | "options" | "destinations" | "destinations_feedback" | "filters" | "flight_dates" | "flight_preference" | "itinerary" | "itinerary_feedback" | "modify_itinerary" | "flights" | "hotels";
 
 export default function Home() {
   const [input, setInput] = useState("");
@@ -20,6 +20,11 @@ export default function Home() {
   const endDateRef = useRef<HTMLInputElement>(null);
   const [plan, setPlan] = useState<TPlanResponse | null>(null);
   const [currentStep, setCurrentStep] = useState<ConversationStep>("start");
+  
+  // Debug log for current step changes
+  useEffect(() => {
+    console.log("Current step changed to:", currentStep);
+  }, [currentStep]);
   const [error, setError] = useState<string | null>(null);
   const [conversationHistory, setConversationHistory] = useState<Array<{
     type: 'user' | 'bot';
@@ -32,6 +37,108 @@ export default function Home() {
   const [tripDuration, setTripDuration] = useState<number>(3); // Store calculated duration
   const [flightPreference, setFlightPreference] = useState<"cheapest" | "good_timing" | null>(null);
   const [flights, setFlights] = useState<any[]>([]);
+
+  // Airport codes mapping (same as backend)
+  const airportCodes: { [key: string]: string } = {
+    'mumbai': 'BOM',
+    'delhi': 'DEL', 
+    'bangalore': 'BLR',
+    'chennai': 'MAA',
+    'kolkata': 'CCU',
+    'hyderabad': 'HYD',
+    'pune': 'PNQ',
+    'goa': 'GOI',
+    'jaipur': 'JAI',
+    'kochi': 'COK',
+    'guwahati': 'GAU',
+    'bhubaneswar': 'BBI',
+    'indore': 'IDR',
+    'coimbatore': 'CJB',
+    'chandigarh': 'IXC',
+    'lucknow': 'LKO',
+    'patna': 'PAT',
+    'varanasi': 'VNS',
+    'srinagar': 'SXR',
+    'dehradun': 'DED',
+    'andaman and nicobar islands': 'IXZ',
+    'port blair': 'IXZ',
+    'maldives': 'MLE',
+    'bali': 'DPS',
+    'santorini': 'JTR',
+    'swiss alps': 'ZUR',
+    'himalayas': 'KTM',
+    'rocky mountains': 'DEN',
+    'tokyo': 'NRT',
+    'paris': 'CDG',
+    'new york': 'JFK',
+    'kenya': 'NBO',
+    'costa rica': 'SJO',
+    'new zealand': 'AKL',
+    'thailand': 'BKK',
+    'italy': 'FCO',
+    'australia': 'SYD'
+  };
+
+  function getAirportCode(city: string): string {
+    const normalizedCity = city.toLowerCase().trim();
+    return airportCodes[normalizedCity] || city; // Return original if no mapping found
+  }
+
+  // Convert date format from YYYY-MM-DD to DD/MM/YYYY
+  function formatDateForAPI(dateString: string): string {
+    const date = new Date(dateString);
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  }
+
+  // Generate mock flight data when API returns empty results
+  function generateMockFlights(originCode: string, destinationCode: string, preference: string | null) {
+    const airlines = ['IndiGo', 'Air India', 'SpiceJet', 'Vistara', 'Go First'];
+    const flights = [];
+    
+    for (let i = 0; i < 3; i++) {
+      const airline = airlines[i % airlines.length];
+      const basePrice = preference === "cheapest" ? 
+        [3500, 4200, 4800][i] : // Cheaper flights first for cheapest preference
+        [5500, 4200, 6800][i];  // Good timing flights with mixed prices
+      
+      const departTimes = preference === "cheapest" ? 
+        ['05:30', '23:45', '02:15'][i] : // Odd hours for cheap flights
+        ['09:00', '14:30', '18:45'][i];  // Good times for timing preference
+      
+      const arrivalTimes = preference === "cheapest" ? 
+        ['08:15', '02:30', '05:00'][i] :
+        ['11:45', '17:15', '21:30'][i];
+        
+      const returnDepartTimes = preference === "cheapest" ? 
+        ['06:15', '01:30', '03:45'][i] :
+        ['10:30', '15:45', '19:15'][i];
+        
+      const returnArrivalTimes = preference === "cheapest" ? 
+        ['09:00', '04:15', '06:30'][i] :
+        ['13:15', '18:30', '22:00'][i];
+
+      flights.push({
+        id: `mock-${i + 1}`,
+        airline: airline,
+        flightNumber: `${airline.substring(0, 2).toUpperCase()}-${Math.floor(Math.random() * 9000) + 1000}`,
+        departTime: departTimes,
+        arrivalTime: arrivalTimes,
+        duration: '2h 30m',
+        price: basePrice + Math.floor(Math.random() * 1000),
+        currency: 'INR',
+        stops: i === 2 ? 1 : 0, // Third flight has a stop
+        from: originCode,
+        to: destinationCode,
+        returnDepartTime: returnDepartTimes,
+        returnArrivalTime: returnArrivalTimes
+      });
+    }
+    
+    return flights;
+  }
 
   // Auto-scroll and focus when date fields appear
   useEffect(() => {
@@ -188,14 +295,14 @@ export default function Home() {
 
   function handleItineraryApproval(approved: boolean) {
     if (approved) {
-      setCurrentStep("booking_options");
       addToConversation('user', "I love this itinerary!");
       addToConversation('bot', 
         <div className="space-y-2">
-          <p>Wonderful! Let's make this dream a reality! 🎉</p>
-          <p>Ready to book flights and hotels?</p>
+          <p>Wonderful! Your dream trip is perfectly planned! 🎉</p>
+          <p>Your itinerary is ready - you can now book flights and hotels through other platforms!</p>
         </div>
       );
+      // Stay on itinerary step to show the complete plan
     } else {
       addToConversation('user', "I'd like to modify the itinerary");
       addToConversation('bot', 
@@ -224,7 +331,7 @@ export default function Home() {
     setCurrentStep("itinerary_feedback");
   }
 
-  function handleDateSubmit() {
+  async function handleDateSubmit() {
     if (!startDate || !endDate) return;
     
     // Calculate number of days
@@ -244,51 +351,17 @@ export default function Home() {
     addToConversation('bot', 
       <div className="space-y-2">
         <p>Perfect! A <strong>{days}-day</strong> trip from {new Date(startDate).toLocaleDateString()} to {new Date(endDate).toLocaleDateString()}! 🗓️</p>
-        <p>For flights, what's more important to you?</p>
+        <p>Let me create your detailed itinerary!</p>
       </div>
     );
     
-    setCurrentStep("flight_preference");
+    // Generate itinerary immediately after date selection
+    await generateItinerary();
   }
 
-  function handleFlightPreference(preference: "cheapest" | "good_timing") {
-    setFlightPreference(preference);
-    const preferenceText = preference === "cheapest" ? "cheapest flights available" : "good timing flights avoiding off-hours";
-    
-    addToConversation('user', `I prefer ${preferenceText}`);
-    addToConversation('bot', 
-      <div className="space-y-2">
-        <p>Great choice! Let me find the best {preference === "cheapest" ? "budget-friendly" : "well-timed"} flights and create your itinerary! ✈️</p>
-        <p>Searching for flights from <strong>{userLocation}</strong> to <strong>{plan?.chosenDestination}</strong>...</p>
-      </div>
-    );
-    
-    // Search for flights and then show itinerary
-    searchFlights();
-  }
-
-  async function searchFlights() {
+  async function generateItinerary() {
     setLoading(true);
     try {
-      // First, search for flights
-      const response = await fetch('/api/flights', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          origin: userLocation,
-          destination: plan?.chosenDestination,
-          startDate: startDate,
-          endDate: endDate,
-          preference: flightPreference
-        }),
-      });
-      
-      const flightData = await response.json();
-      setFlights(flightData.flights || []);
-      
-      // Now regenerate the itinerary with the correct duration
       if (plan?.chosenDestination) {
         const updatedPrompt = `Create a detailed ${tripDuration}-day itinerary for ${plan.chosenDestination}. I'm traveling from ${userLocation} from ${new Date(startDate).toLocaleDateString()} to ${new Date(endDate).toLocaleDateString()}. ${input}`;
         
@@ -311,8 +384,8 @@ export default function Home() {
       
       addToConversation('bot', 
         <div className="space-y-2">
-          <p>Found amazing {flightPreference === "cheapest" ? "budget-friendly" : "well-timed"} flight options for you! ✈️</p>
-          <p>Here's your complete {tripDuration}-day itinerary with the best flights for your preference:</p>
+          <p>Here's your perfect {tripDuration}-day itinerary for <strong>{plan?.chosenDestination}</strong>! ✨</p>
+          <p>Ready to book flights when you are!</p>
         </div>
       );
       
@@ -322,15 +395,115 @@ export default function Home() {
       setTimeout(() => showItineraryFeedback(), 3000);
       
     } catch (error) {
-      console.error('Error searching flights:', error);
+      console.error('Error generating itinerary:', error);
       addToConversation('bot', 
-        <div className="space-y-2">
-          <p>I'll show you the {tripDuration}-day itinerary while I continue searching for the best {flightPreference === "cheapest" ? "budget-friendly" : "well-timed"} flights! 🛫</p>
-          <p className="text-sm text-gray-600">Flight search is taking longer than expected, but I'll keep looking for great options.</p>
-        </div>
+        <p>Here's your {tripDuration}-day itinerary! Let me know when you're ready to book flights! ✈️</p>
       );
       setCurrentStep("itinerary");
       setTimeout(() => showItineraryFeedback(), 3000);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleFlightPreference(preference: "cheapest" | "good_timing") {
+    console.log("handleFlightPreference called with:", preference); // Debug log
+    setFlightPreference(preference);
+    const preferenceText = preference === "cheapest" ? "cheapest flights available" : "good timing flights avoiding off-hours";
+    
+    addToConversation('user', `I prefer ${preferenceText}`);
+    addToConversation('bot', 
+      <div className="space-y-2">
+        <p>Great choice! Let me find the best {preference === "cheapest" ? "budget-friendly" : "well-timed"} flights! ✈️</p>
+        <p>Searching for flights from <strong>{userLocation}</strong> to <strong>{plan?.chosenDestination}</strong>...</p>
+      </div>
+    );
+    
+    console.log("About to call searchFlights..."); // Debug log
+    // Search for flights based on preference
+    await searchFlights();
+  }
+
+  async function searchFlights() {
+    console.log("searchFlights function called!"); // Debug log
+    
+    // Convert city names to airport codes
+    const originCode = getAirportCode(userLocation);
+    const destinationCode = getAirportCode(plan?.chosenDestination || '');
+    
+    // Convert dates to DD/MM/YYYY format
+    const formattedStartDate = formatDateForAPI(startDate);
+    const formattedEndDate = formatDateForAPI(endDate);
+    
+    console.log("Flight search data:", { 
+      originalOrigin: userLocation, 
+      originCode, 
+      originalDestination: plan?.chosenDestination, 
+      destinationCode, 
+      originalStartDate: startDate,
+      formattedStartDate,
+      originalEndDate: endDate, 
+      formattedEndDate,
+      preference: flightPreference 
+    }); // Debug log
+    
+    setLoading(true);
+    try {
+      // Search for flights with the user's preference
+      console.log("About to make API call to /api/flights"); // Debug log
+      const response = await fetch('/api/flights', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          origin: originCode,
+          destination: destinationCode,
+          startDate: formattedStartDate,
+          endDate: formattedEndDate,
+          preference: flightPreference
+        }),
+      });
+      
+      const flightData = await response.json();
+      console.log('Flight API Response:', flightData); // Debug log
+      
+      let flights = flightData.flights || [];
+      
+      // If no flights found, use mock data
+      if (flights.length === 0) {
+        console.log("No flights found, using mock data"); // Debug log
+        flights = generateMockFlights(originCode, destinationCode, flightPreference);
+      }
+      
+      setFlights(flights);
+      
+      addToConversation('bot', 
+        <div className="space-y-2">
+          <p>Found amazing {flightPreference === "cheapest" ? "budget-friendly" : "well-timed"} flight options for you! ✈️</p>
+          <p>Here are the best flights from {originCode} to {destinationCode} based on your preference:</p>
+          {flights.length > 0 && flightData.flights?.length === 0 && (
+            <p className="text-sm text-gray-600">⚠️ Using sample data - real flight search didn't return results</p>
+          )}
+        </div>
+      );
+      
+      setCurrentStep("flights");
+      
+    } catch (error) {
+      console.error('Error searching flights:', error);
+      
+      // Show mock flights even on error
+      const mockFlights = generateMockFlights(originCode, destinationCode, flightPreference);
+      setFlights(mockFlights);
+      
+      addToConversation('bot', 
+        <div className="space-y-2">
+          <p>I'm having trouble connecting to the flight search service, but here are some sample options! 🛫</p>
+          <p className="text-sm text-gray-600">⚠️ Showing sample data - please check with airlines for real-time availability and prices.</p>
+        </div>
+      );
+      setCurrentStep("flights");
     } finally {
       setLoading(false);
     }
@@ -553,7 +726,7 @@ export default function Home() {
                           {flightPreference === "cheapest" ? "💰 Cheapest Flight Options" : "⏰ Best Timed Flights"}
                         </h3>
                         <p className="text-gray-600">
-                          From {userLocation} to {plan?.chosenDestination} | {startDate && endDate ? `${new Date(startDate).toLocaleDateString()} to ${new Date(endDate).toLocaleDateString()}` : 'Dates TBD'}
+                          From {userLocation} ({getAirportCode(userLocation)}) to {plan?.chosenDestination} ({getAirportCode(plan?.chosenDestination || '')}) | {startDate && endDate ? `${new Date(startDate).toLocaleDateString()} to ${new Date(endDate).toLocaleDateString()}` : 'Dates TBD'}
                         </p>
                         {flightPreference && (
                           <div className="inline-flex items-center gap-2 bg-orange-100 text-orange-800 px-3 py-1 rounded-full text-sm mt-2">
@@ -637,7 +810,7 @@ export default function Home() {
                            <div className="text-center py-12 text-gray-500">
                              <Plane className="w-16 h-16 mx-auto mb-4 text-gray-300" />
                              <p className="text-lg">Searching for the best {flightPreference === "cheapest" ? "budget-friendly" : "well-timed"} flights...</p>
-                             <p className="text-sm">Checking {flightPreference === "cheapest" ? "cheapest options" : "flights with good timing"} from {userLocation} to {plan?.chosenDestination}</p>
+                             <p className="text-sm">Checking {flightPreference === "cheapest" ? "cheapest options" : "flights with good timing"} from {getAirportCode(userLocation)} to {getAirportCode(plan?.chosenDestination || '')}</p>
                              <div className="mt-4">
                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto"></div>
                              </div>
@@ -923,7 +1096,7 @@ export default function Home() {
                     
                     <button 
                       disabled={!startDate || !endDate} 
-                      onClick={handleDateSubmit}
+                      onClick={() => handleDateSubmit()}
                       className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white py-4 px-6 rounded-2xl font-semibold text-lg disabled:opacity-50 hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2 disabled:cursor-not-allowed"
                     >
                       <Calendar className="w-5 h-5" />
@@ -992,76 +1165,30 @@ export default function Home() {
                    </div>
                  )}
 
-                 {currentStep === "itinerary_feedback" && plan && (
-                   <div className="flex gap-2 justify-center overflow-x-auto pb-2">
-                     <OptionButton onClick={() => handleItineraryApproval(true)} icon={<ThumbsUp className="w-4 h-4" />}>
-                       I Love It! Let's Book
-                     </OptionButton>
-                     <OptionButton onClick={() => handleItineraryApproval(false)} icon={<Edit className="w-4 h-4" />}>
-                       Modify Itinerary
-                     </OptionButton>
-                     <OptionButton onClick={() => {
-                       addToConversation('user', "Add more days to the trip");
-                       addToConversation('bot', 
-                         <p>Great idea! How many additional days would you like? I can extend your <strong>{plan.chosenDestination}</strong> adventure! 📅</p>
-                       );
-                     }} icon={<Calendar className="w-4 h-4" />}>
-                       Add More Days
-                     </OptionButton>
-                   </div>
-                 )}
-
-                                 {currentStep === "booking_options" && plan && (
+                                 {currentStep === "itinerary_feedback" && plan && (
                   <div className="flex gap-2 justify-center overflow-x-auto pb-2">
-                    <OptionButton onClick={async () => {
+                    <OptionButton onClick={() => handleItineraryApproval(true)} icon={<ThumbsUp className="w-4 h-4" />}>
+                      I Love This Itinerary!
+                    </OptionButton>
+                    <OptionButton onClick={() => {
                       addToConversation('user', "Book flights");
                       addToConversation('bot', 
                         <div className="space-y-2">
-                          <p>Perfect! Let me search for the best {flightPreference === "cheapest" ? "budget-friendly" : "well-timed"} flights from <strong>{userLocation}</strong> to <strong>{plan.chosenDestination}</strong>! ✈️</p>
-                          <p>Searching based on your preference for {flightPreference === "cheapest" ? "cheapest flights" : "good timing flights"}...</p>
+                          <p>Perfect! Let me help you find the best flights from <strong>{userLocation}</strong> to <strong>{plan.chosenDestination}</strong>! ✈️</p>
+                          <p>What's more important to you for your flights?</p>
                         </div>
                       );
-                      
-                      // Ensure we have all required information
-                      if (!startDate || !endDate) {
-                        addToConversation('bot', 
-                          <p>I need your travel dates first! When would you like to travel?</p>
-                        );
-                        setCurrentStep("flight_dates");
-                      } else if (!flightPreference) {
-                        addToConversation('bot', 
-                          <div className="space-y-2">
-                            <p>I need to know your flight preference first!</p>
-                            <p>What's more important to you for your flights?</p>
-                          </div>
-                        );
-                        setCurrentStep("flight_preference");
-                      } else {
-                        // Call the actual flight search API
-                        await searchFlights();
-                      }
+                      setCurrentStep("flight_preference");
                     }} icon={<Plane className="w-4 h-4" />}>
                       Book Flights
                     </OptionButton>
-                     <OptionButton onClick={() => {
-                       addToConversation('user', "Book hotels");
-                       addToConversation('bot', 
-                         <p>Excellent! Here are the best hotel options in <strong>{plan.chosenDestination}</strong>! 🏨</p>
-                       );
-                       setCurrentStep("hotels");
-                     }} icon={<Hotel className="w-4 h-4" />}>
-                       Book Hotels
-                     </OptionButton>
-                     <OptionButton onClick={() => {
-                       addToConversation('user', "Show me travel tips");
-                       addToConversation('bot', 
-                         <p>Great question! Let me share some insider tips for your <strong>{plan.chosenDestination}</strong> adventure! 💡</p>
-                       );
-                     }} icon={<BookOpen className="w-4 h-4" />}>
-                       Travel Tips
-                     </OptionButton>
-                   </div>
-                 )}
+                    <OptionButton onClick={() => handleItineraryApproval(false)} icon={<Edit className="w-4 h-4" />}>
+                      Modify Itinerary
+                    </OptionButton>
+                  </div>
+                )}
+
+                 
                </div>
              </div>
            </div>

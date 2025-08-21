@@ -148,13 +148,7 @@ export default function Itinerary({ days }: { days: Day[] }) {
           <Calendar className="w-8 h-8 text-white" />
         </div>
         <h3 className="text-2xl font-bold text-gray-800 mb-2">Your Itinerary is Ready!</h3>
-        <p className="text-gray-600 max-w-md mx-auto">
-          You have a complete {days.length}-day travel plan. Book your flights and hotels to make this dream a reality.
-        </p>
-        <div className="flex items-center justify-center gap-4 mt-6">
-          <button className="btn btn-primary">Book Flights</button>
-          <button className="btn btn-secondary">Book Hotels</button>
-        </div>
+        
       </motion.div>
     </div>
   );

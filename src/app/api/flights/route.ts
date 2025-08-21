@@ -50,7 +50,24 @@ const airportCodes: { [key: string]: string } = {
   'patna': 'PAT',
   'varanasi': 'VNS',
   'srinagar': 'SXR',
-  'dehradun': 'DED'
+  'dehradun': 'DED',
+  'andaman and nicobar islands': 'IXZ', // Port Blair
+  'port blair': 'IXZ',
+  'maldives': 'MLE',
+  'bali': 'DPS',
+  'santorini': 'JTR',
+  'swiss alps': 'ZUR', // Zurich
+  'himalayas': 'KTM', // Kathmandu
+  'rocky mountains': 'DEN', // Denver
+  'tokyo': 'NRT',
+  'paris': 'CDG',
+  'new york': 'JFK',
+  'kenya': 'NBO', // Nairobi
+  'costa rica': 'SJO', // San Jose
+  'new zealand': 'AKL', // Auckland
+  'thailand': 'BKK', // Bangkok
+  'italy': 'FCO', // Rome
+  'australia': 'SYD' // Sydney
 };
 
 function getAirportCode(city: string): string {
@@ -58,8 +75,14 @@ function getAirportCode(city: string): string {
   return airportCodes[normalizedCity] || 'DEL'; // Default to Delhi
 }
 
-// Convert date format from YYYY-MM-DD to DD/MM/YYYY
+// Handle date format - if already DD/MM/YYYY, return as is, otherwise convert from YYYY-MM-DD
 function formatDate(dateString: string): string {
+  // Check if already in DD/MM/YYYY format
+  if (dateString.includes('/') && dateString.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
+    return dateString; // Already in correct format
+  }
+  
+  // Convert from YYYY-MM-DD to DD/MM/YYYY
   const date = new Date(dateString);
   const day = date.getDate().toString().padStart(2, '0');
   const month = (date.getMonth() + 1).toString().padStart(2, '0');
@@ -70,6 +93,8 @@ function formatDate(dateString: string): string {
 export async function POST(request: NextRequest) {
   try {
     const { origin, destination, startDate, endDate, preference } = await request.json();
+    
+    console.log("Flight API received:", { origin, destination, startDate, endDate, preference }); // Debug log
 
     // Get auth token
     const authToken = await getAuthToken();
@@ -77,10 +102,24 @@ export async function POST(request: NextRequest) {
     // Convert city names to airport codes
     const originCode = getAirportCode(origin);
     const destinationCode = getAirportCode(destination);
+    
+    console.log("Airport code conversion:", { 
+      originalOrigin: origin, 
+      originCode, 
+      originalDestination: destination, 
+      destinationCode 
+    }); // Debug log
 
     // Format dates
     const formattedStartDate = formatDate(startDate);
     const formattedEndDate = formatDate(endDate);
+    
+    console.log("Date formatting:", { 
+      originalStartDate: startDate, 
+      formattedStartDate, 
+      originalEndDate: endDate, 
+      formattedEndDate 
+    }); // Debug log
 
     // Prepare search request
     const searchRequest = {
@@ -131,6 +170,8 @@ export async function POST(request: NextRequest) {
       }
     };
 
+    console.log("Sending to Cleartrip API:", JSON.stringify(searchRequest, null, 2)); // Debug log
+    
     // Search for flights
     const searchResponse = await fetch('https://qa-air-b2b.cleartrip.com/air/api/v4/search', {
       method: 'POST',
