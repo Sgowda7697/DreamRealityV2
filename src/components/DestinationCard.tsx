@@ -5,55 +5,108 @@ import { MapPin, Star, ArrowRight, Clock } from "lucide-react";
 export default function DestinationCard({ name, summary, tags, onSelect }:{
   name: string; summary?: string; tags?: string[]; onSelect?: ()=>void;
 }){
-  // Generate a beautiful background based on destination name
+  // Get a random destination image with beautiful overlays
   const getDestinationImage = (name: string) => {
-    const destinations: Record<string, string> = {
-      'Goa': `linear-gradient(135deg, rgba(255, 107, 53, 0.7), rgba(0, 0, 0, 0.4)), url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'%3E%3Cdefs%3E%3ClinearGradient id='beach' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%23ff6b35;stop-opacity:0.9'/%3E%3Cstop offset='50%25' style='stop-color:%2300d4ff;stop-opacity:0.7'/%3E%3Cstop offset='100%25' style='stop-color:%23ff4757;stop-opacity:0.8'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='400' height='300' fill='url(%23beach)'/%3E%3Cpath d='M0,150 Q100,100 200,150 T400,150 L400,300 L0,300 Z' fill='%23ffffff' fill-opacity='0.2'/%3E%3Ccircle cx='320' cy='80' r='30' fill='%23ffdd59' opacity='0.8'/%3E%3C/svg%3E")`,
-      'Mysore': `linear-gradient(135deg, rgba(147, 51, 234, 0.7), rgba(0, 0, 0, 0.4)), url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'%3E%3Cdefs%3E%3ClinearGradient id='palace' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%23ffd700;stop-opacity:0.8'/%3E%3Cstop offset='50%25' style='stop-color:%23ff6b35;stop-opacity:0.7'/%3E%3Cstop offset='100%25' style='stop-color:%23e74c3c;stop-opacity:0.8'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='400' height='300' fill='url(%23palace)'/%3E%3Crect x='150' y='80' width='100' height='140' fill='%23ffffff' fill-opacity='0.3'/%3E%3Cpolygon points='150,80 200,40 250,80' fill='%23ffffff' fill-opacity='0.4'/%3E%3C/svg%3E")`,
-      'Rajasthan': `linear-gradient(135deg, rgba(255, 193, 7, 0.8), rgba(0, 0, 0, 0.4)), url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'%3E%3Cdefs%3E%3ClinearGradient id='desert' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%23ffc107;stop-opacity:0.9'/%3E%3Cstop offset='50%25' style='stop-color:%23ff6b35;stop-opacity:0.7'/%3E%3Cstop offset='100%25' style='stop-color:%23dc3545;stop-opacity:0.8'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='400' height='300' fill='url(%23desert)'/%3E%3Cpath d='M0,200 Q100,160 200,200 T400,200 L400,300 L0,300 Z' fill='%23f4a261' fill-opacity='0.6'/%3E%3Cpath d='M50,150 Q150,100 250,150 T400,150 L400,200 L0,200 Z' fill='%23e76f51' fill-opacity='0.4'/%3E%3C/svg%3E")`,
-      'Himachal': `linear-gradient(135deg, rgba(34, 197, 94, 0.7), rgba(0, 0, 0, 0.4)), url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'%3E%3Cdefs%3E%3ClinearGradient id='mountain' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%2322c55e;stop-opacity:0.8'/%3E%3Cstop offset='50%25' style='stop-color:%233b82f6;stop-opacity:0.7'/%3E%3Cstop offset='100%25' style='stop-color:%236366f1;stop-opacity:0.8'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='400' height='300' fill='url(%23mountain)'/%3E%3Cpolygon points='0,200 100,100 200,150 300,80 400,120 400,300 0,300' fill='%23ffffff' fill-opacity='0.2'/%3E%3Cpolygon points='80,120 150,60 220,100 280,50 350,80 400,0 400,120' fill='%23ffffff' fill-opacity='0.3'/%3E%3C/svg%3E")`
+    // List of all available images
+    const images = [
+      'licensed-image.jpeg',
+      'licensed-image (1).jpeg',
+      'licensed-image (2).jpeg',
+      'licensed-image (3).jpeg',
+      'licensed-image (4).jpeg',
+      'licensed-image (5).jpeg',
+      'licensed-image (6).jpeg',
+      'licensed-image (7).jpeg',
+      'licensed-image (8).jpeg',
+      'licensed-image (9).jpeg',
+      'licensed-image (10).jpeg',
+      'licensed-image (11).jpeg',
+      'licensed-image (12).jpeg',
+      'licensed-image (13).jpeg',
+      'licensed-image (14).jpeg',
+      'licensed-image (15).jpeg',
+      'licensed-image (16).jpeg',
+      'licensed-image (17).jpeg',
+      'licensed-image (18).jpeg',
+      'licensed-image (19).jpeg'
+    ];
+
+    // Create a hash from the destination name for consistent image assignment
+    const getImageIndex = (str: string) => {
+      let hash = 0;
+      for (let i = 0; i < str.length; i++) {
+        const char = str.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash; // Convert to 32-bit integer
+      }
+      return Math.abs(hash) % images.length;
     };
 
-    return destinations[name] || `linear-gradient(135deg, rgba(59, 130, 246, 0.7), rgba(0, 0, 0, 0.4)), url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'%3E%3Cdefs%3E%3ClinearGradient id='default' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%233b82f6;stop-opacity:0.8'/%3E%3Cstop offset='50%25' style='stop-color:%238b5cf6;stop-opacity:0.7'/%3E%3Cstop offset='100%25' style='stop-color:%23ec4899;stop-opacity:0.8'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='400' height='300' fill='url(%23default)'/%3E%3C/svg%3E")`;
+    const selectedImage = images[getImageIndex(name)];
+    
+    // Different overlay gradients for variety
+    const overlays = [
+      'linear-gradient(135deg, rgba(255, 107, 53, 0.65), rgba(0, 0, 0, 0.4))',
+      'linear-gradient(135deg, rgba(59, 130, 246, 0.6), rgba(0, 0, 0, 0.45))',
+      'linear-gradient(135deg, rgba(147, 51, 234, 0.6), rgba(0, 0, 0, 0.4))',
+      'linear-gradient(135deg, rgba(34, 197, 94, 0.6), rgba(0, 0, 0, 0.4))',
+      'linear-gradient(135deg, rgba(255, 193, 7, 0.65), rgba(0, 0, 0, 0.4))',
+      'linear-gradient(135deg, rgba(236, 72, 153, 0.6), rgba(0, 0, 0, 0.45))',
+      'linear-gradient(135deg, rgba(239, 68, 68, 0.6), rgba(0, 0, 0, 0.4))',
+      'linear-gradient(135deg, rgba(16, 185, 129, 0.6), rgba(0, 0, 0, 0.4))'
+    ];
+
+    const overlayIndex = getImageIndex(name + 'overlay') % overlays.length;
+    const selectedOverlay = overlays[overlayIndex];
+
+    return `${selectedOverlay}, url("/images/destinations/${selectedImage}")`;
   };
 
   return (
     <motion.div
       whileHover={{ y: -8, scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
-      className="destination-card group cursor-pointer"
+      className="destination-card group cursor-pointer relative overflow-hidden rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300"
       onClick={onSelect}
       style={{
         backgroundImage: getDestinationImage(name),
         backgroundSize: 'cover',
-        backgroundPosition: 'center'
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        minHeight: '300px',
+        border: '1px solid rgba(255, 255, 255, 0.1)'
       }}
     >
-      <div className="destination-card-content">
+      {/* Enhanced overlay for better text readability */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent group-hover:from-black/70 transition-all duration-300" />
+      
+      {/* Subtle shimmer effect on hover */}
+      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent opacity-0 group-hover:opacity-100 transform -skew-x-12 translate-x-[-100%] group-hover:translate-x-[100%] transition-all duration-700" />
+      <div className="relative z-10 h-full flex flex-col p-6">
         {/* Header */}
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-2 text-white/90">
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex items-center gap-2 text-white/90 backdrop-blur-sm bg-black/20 px-3 py-1 rounded-full border border-white/20">
             <MapPin className="w-4 h-4" />
             <span className="text-sm font-medium">Destination</span>
           </div>
           
           <motion.div
-            whileHover={{ scale: 1.1 }}
+            whileHover={{ scale: 1.1, rotate: 5 }}
             whileTap={{ scale: 0.9 }}
-            className="bg-white/20 backdrop-blur-sm rounded-full p-2 border border-white/30 group-hover:bg-white/30 transition-colors"
+            className="bg-white/20 backdrop-blur-md rounded-full p-2.5 border border-white/30 group-hover:bg-white/30 group-hover:border-white/50 transition-all duration-300 shadow-lg"
           >
-            <ArrowRight className="w-4 h-4 text-white" />
+            <ArrowRight className="w-4 h-4 text-white drop-shadow-sm" />
           </motion.div>
         </div>
 
         {/* Main Content */}
-        <div className="mt-auto">
-          <h3 className="text-2xl md:text-3xl font-bold text-white mb-2 group-hover:text-orange-100 transition-colors">
+        <div className="flex-1 flex flex-col justify-end">
+          <h3 className="text-2xl md:text-3xl font-bold text-white mb-3 group-hover:text-orange-100 transition-colors drop-shadow-lg">
             {name}
           </h3>
           
           {summary && (
-            <p className="text-white/90 text-sm mb-4 leading-relaxed group-hover:text-white transition-colors">
+            <p className="text-white/95 text-sm mb-4 leading-relaxed group-hover:text-white transition-colors backdrop-blur-sm bg-black/10 p-3 rounded-lg border border-white/10">
               {summary}
             </p>
           )}
@@ -67,7 +120,7 @@ export default function DestinationCard({ name, summary, tags, onSelect }:{
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ duration: 0.3, delay: index * 0.1 }}
-                  className="badge"
+                  className="bg-white/20 backdrop-blur-sm text-white text-xs px-3 py-1 rounded-full border border-white/20 font-medium group-hover:bg-white/30 transition-all duration-300"
                 >
                   #{tag}
                 </motion.span>
@@ -76,24 +129,25 @@ export default function DestinationCard({ name, summary, tags, onSelect }:{
           )}
 
           {/* Call to Action */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-white/80">
+          <div className="flex items-center justify-between pt-2">
+            <div className="flex items-center gap-2 text-white/90 backdrop-blur-sm bg-black/20 px-3 py-2 rounded-lg border border-white/20">
               <Clock className="w-4 h-4" />
-              <span className="text-sm">Plan your trip</span>
+              <span className="text-sm font-medium">Plan your trip</span>
             </div>
             
             <motion.button
-              whileHover={{ scale: 1.05 }}
+              whileHover={{ scale: 1.05, y: -2 }}
               whileTap={{ scale: 0.95 }}
-              className="bg-white text-gray-800 px-4 py-2 rounded-lg font-semibold text-sm shadow-lg hover:shadow-xl transition-shadow group-hover:bg-orange-50"
+              className="bg-white/95 backdrop-blur-sm text-gray-800 px-5 py-2.5 rounded-xl font-semibold text-sm shadow-xl hover:shadow-2xl transition-all duration-300 group-hover:bg-white border border-white/20 hover:border-orange-200"
             >
               Select
             </motion.button>
           </div>
         </div>
 
-        {/* Cleartrip-style bottom accent */}
-        <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-orange-400 via-red-500 to-pink-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+        {/* Enhanced bottom accent with blur */}
+        <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-gradient-to-r from-orange-400 via-red-500 to-pink-500 opacity-0 group-hover:opacity-100 transition-opacity duration-500 shadow-lg" />
+        <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-orange-400/20 via-red-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-sm" />
       </div>
     </motion.div>
   );

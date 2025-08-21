@@ -7,7 +7,7 @@ import DestinationCard from "@/components/DestinationCard";
 import Itinerary from "@/components/Itinerary";
 import type { TPlanResponse } from "@/lib/schema";
 
-type ConversationStep = "start" | "location" | "planning" | "options" | "destinations" | "destinations_feedback" | "filters" | "flight_dates" | "flight_preference" | "itinerary" | "itinerary_feedback" | "modify_itinerary" | "flights" | "hotels";
+type ConversationStep = "start" | "location" | "planning" | "options" | "destinations" | "destinations_feedback" | "action_choice" | "filters" | "flight_dates" | "flight_preference" | "itinerary" | "itinerary_feedback" | "modify_itinerary" | "flights" | "hotels" | "packages";
 
 export default function Home() {
   const [input, setInput] = useState("");
@@ -37,6 +37,8 @@ export default function Home() {
   const [tripDuration, setTripDuration] = useState<number>(3); // Store calculated duration
   const [flightPreference, setFlightPreference] = useState<"cheapest" | "good_timing" | null>(null);
   const [flights, setFlights] = useState<any[]>([]);
+  const [hotels, setHotels] = useState<any[]>([]);
+  const [showHotels, setShowHotels] = useState<boolean>(false);
 
   // Airport codes mapping (same as backend)
   const airportCodes: { [key: string]: string } = {
@@ -140,6 +142,47 @@ export default function Home() {
     return flights;
   }
 
+  // Generate mock hotel data
+  function generateMockHotels(destination: string) {
+    const hotelNames = [
+      `Grand ${destination} Palace`,
+      `${destination} Paradise Resort`,
+      `Royal ${destination} Hotel`
+    ];
+
+    const amenities = [
+      ['Free WiFi', 'Swimming Pool', 'Spa', 'Restaurant', 'Room Service'],
+      ['Free WiFi', 'Beach Access', 'Bar', 'Fitness Center', 'Breakfast'],
+      ['Free WiFi', 'City View', 'Business Center', 'Parking', 'Concierge']
+    ];
+
+    const hotels = [];
+    
+    for (let i = 0; i < 3; i++) {
+      const starRating = [5, 4, 4][i]; // First hotel is 5-star, others are 4-star
+      const basePrice = [8500, 6200, 4800][i]; // Decreasing price order
+      const ratings = [4.8, 4.5, 4.2][i];
+      
+      hotels.push({
+        id: `hotel-${i + 1}`,
+        name: hotelNames[i],
+        starRating: starRating,
+        rating: ratings,
+        reviews: Math.floor(Math.random() * 2000) + 500,
+        price: basePrice + Math.floor(Math.random() * 500),
+        currency: 'INR',
+        amenities: amenities[i],
+        image: `/images/destinations/licensed-image${i === 0 ? '' : ` (${i + 1})`}.jpeg`, // Use destination images as hotel images
+        location: `${destination} City Center`,
+        breakfastIncluded: i < 2, // First two hotels include breakfast
+        freeWifi: true,
+        cancellation: i === 0 ? 'Free Cancellation' : 'Non-refundable'
+      });
+    }
+    
+    return hotels;
+  }
+
   // Auto-scroll and focus when date fields appear
   useEffect(() => {
     if (currentStep === "flight_dates") {
@@ -237,11 +280,37 @@ export default function Home() {
     addToConversation('bot', 
       <div className="space-y-2">
         <p>Fantastic choice! <strong>{name}</strong> is absolutely magical! ✨</p>
-        <p>Before I create your detailed itinerary, when would you like to travel?</p>
+        <p>What would you like to do next?</p>
       </div>
     );
     
+    setCurrentStep("action_choice");
+  }
+
+  function handleShowItinerary() {
+    addToConversation('user', 'Show me detailed itinerary');
+    addToConversation('bot', 
+      <div className="space-y-2">
+        <p>Perfect! I'll create a detailed itinerary for <strong>{plan?.chosenDestination}</strong>! 📋</p>
+        <p>When would you like to travel?</p>
+      </div>
+    );
     setCurrentStep("flight_dates");
+  }
+
+  function handleExplorePackages() {
+    addToConversation('user', 'Explore travel packages');
+    addToConversation('bot', 
+      <div className="space-y-2">
+        <p>Perfect! I'm taking you to Cleartrip's curated holiday packages for <strong>{plan?.chosenDestination}</strong>! 🎁</p>
+        <p>You'll find amazing deals and pre-planned packages from trusted travel experts.</p>
+      </div>
+    );
+    
+    // Redirect to Cleartrip holidays page in a new tab
+    setTimeout(() => {
+      window.open('https://www.cleartrip.com/holidays/', '_blank');
+    }, 1500);
   }
 
   function showDestinations() {
@@ -424,6 +493,22 @@ export default function Home() {
     await searchFlights();
   }
 
+  function handleBookHotels() {
+    if (!plan?.chosenDestination) return;
+    
+    const mockHotels = generateMockHotels(plan.chosenDestination);
+    setHotels(mockHotels);
+    setShowHotels(true);
+    
+    addToConversation('user', 'Book hotels');
+    addToConversation('bot', 
+      <div className="space-y-2">
+        <p>Perfect! Here are the best hotels in <strong>{plan.chosenDestination}</strong> for your stay! 🏨</p>
+        <p>These hotels are highly rated and perfect for your travel dates.</p>
+      </div>
+    );
+  }
+
   async function searchFlights() {
     console.log("searchFlights function called!"); // Debug log
     
@@ -555,16 +640,22 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-red-50 to-pink-50">
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Full Page Background Image with Animation */}
+      <div 
+        className="fixed inset-0 bg-cover bg-center bg-no-repeat animate-ken-burns"
+        style={{
+          backgroundImage: `url("/images/backgrounds/background.jpeg")`,
+          zIndex: -2
+        }}
+      />
+      
+      {/* Full Page Overlay for text readability */}
+      <div className="fixed inset-0 bg-black/75" style={{ zIndex: -1 }} />
+      
       {/* Hero Section - Only shown initially */}
       {currentStep === "start" && (
-        <section className="hero-section relative flex items-center justify-center text-center text-white min-h-screen">
-          <div 
-            className="absolute inset-0 bg-cover bg-center"
-            style={{
-              backgroundImage: `linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.3)), url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 800'%3E%3Cdefs%3E%3ClinearGradient id='tropical' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%23ff6b35;stop-opacity:0.8'/%3E%3Cstop offset='50%25' style='stop-color:%233742fa;stop-opacity:0.6'/%3E%3Cstop offset='100%25' style='stop-color:%23ff4757;stop-opacity:0.8'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='1200' height='800' fill='url(%23tropical)'/%3E%3Cpath d='M0,400 Q300,200 600,400 T1200,400 L1200,800 L0,800 Z' fill='%23ffffff' fill-opacity='0.1'/%3E%3C/svg%3E")`
-            }}
-          />
+        <section className="hero-section relative flex items-center justify-center text-center text-white min-h-screen overflow-hidden">
           
           <div className="relative z-10 container px-4 py-20">
             <motion.div
@@ -573,11 +664,30 @@ export default function Home() {
               transition={{ duration: 0.8 }}
               className="max-w-4xl mx-auto"
             >
-              <h1 className="text-4xl md:text-6xl font-bold mb-4">
+              {/* Brand Title */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 1, delay: 0.2 }}
+                className="mb-8"
+              >
+                <h1 className="text-5xl md:text-7xl font-extrabold mb-2 text-white drop-shadow-2xl" style={{ 
+                  textShadow: '3px 3px 8px rgba(0,0,0,0.9), 1px 1px 3px rgba(0,0,0,0.8)' 
+                }}>
+                  Dream 2 Reality
+                </h1>
+                <div className="w-32 h-1 bg-gradient-to-r from-orange-400 to-pink-400 mx-auto rounded-full shadow-2xl"></div>
+              </motion.div>
+              
+              <h2 className="text-3xl md:text-5xl font-bold mb-4 text-white" style={{ 
+                textShadow: '2px 2px 6px rgba(0,0,0,0.9), 1px 1px 3px rgba(0,0,0,0.7)' 
+              }}>
                 Your Dream Vacation<br />
                 <span className="text-orange-300">Starts Here</span>
-              </h1>
-              <p className="text-xl md:text-2xl mb-8 text-gray-100">
+              </h2>
+              <p className="text-xl md:text-2xl mb-8 text-gray-100" style={{ 
+                textShadow: '2px 2px 6px rgba(0,0,0,0.9), 1px 1px 2px rgba(0,0,0,0.8)' 
+              }}>
                 Where do you want to start your dreamcation from?
               </p>
               
@@ -590,7 +700,7 @@ export default function Home() {
                 <div className="relative">
                   <Navigation className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                   <input 
-                    className="w-full pl-12 pr-4 py-4 border-2 border-white/30 rounded-2xl bg-white/90 backdrop-blur-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-gray-700 text-lg placeholder-gray-500"
+                    className="w-full pl-12 pr-4 py-4 border-2 border-white/40 rounded-2xl bg-white/95 backdrop-blur-md focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-gray-700 text-lg placeholder-gray-500 shadow-xl"
                     placeholder="e.g., Mumbai, Delhi, Bangalore, Chennai..."
                     value={userLocation} 
                     onChange={e=>setUserLocation(e.target.value)} 
@@ -607,7 +717,7 @@ export default function Home() {
                   onClick={handleLocationSubmit}
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white py-4 px-6 rounded-2xl font-semibold text-lg disabled:opacity-50 hover:shadow-lg transition-all duration-200"
+                  className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white py-4 px-6 rounded-2xl font-semibold text-lg disabled:opacity-50 hover:shadow-xl transition-all duration-300 shadow-lg backdrop-blur-sm border border-white/20"
                 >
                   <Navigation className="w-5 h-5 inline mr-2" />
                   Let's Start Planning!
@@ -620,9 +730,9 @@ export default function Home() {
 
                            {/* Main Split Layout */}
        {currentStep !== "start" && (
-         <div className="min-h-screen flex">
+         <div className="min-h-screen flex relative z-10 gap-4 p-4">
            {/* Left Panel - Results & Suggestions */}
-           <div className="flex-1 lg:w-1/2 bg-gray-50">
+           <div className="w-full lg:w-3/5 bg-white/95 backdrop-blur-md border border-white/20 rounded-2xl">
              <div className="h-full overflow-y-auto">
                <div className="p-6">
                  <div className="text-center mb-6">
@@ -711,6 +821,147 @@ export default function Home() {
                          </p>
                        </div>
                        <Itinerary days={plan.itinerary as any} />
+                     </motion.div>
+                   )}
+
+                   {/* Packages Display */}
+                   {currentStep === "packages" && plan?.chosenDestination && (
+                     <motion.div 
+                       initial={{ opacity: 0, y: 30 }}
+                       animate={{ opacity: 1, y: 0 }}
+                       transition={{ duration: 0.6 }}
+                     >
+                       <div className="text-center mb-6">
+                         <h3 className="text-xl font-bold text-gray-800 mb-2">🎁 Travel Packages for {plan.chosenDestination}</h3>
+                         <p className="text-gray-600">Curated packages from trusted travel partners</p>
+                       </div>
+                       
+                       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                         {/* Premium Package */}
+                         <motion.div 
+                           whileHover={{ y: -4, scale: 1.02 }}
+                           className="bg-gradient-to-br from-orange-50 to-red-50 rounded-xl p-6 border border-orange-200 shadow-lg hover:shadow-xl transition-all duration-300"
+                         >
+                           <div className="flex items-center justify-between mb-4">
+                             <div className="bg-orange-500 text-white px-3 py-1 rounded-full text-sm font-medium">
+                               Premium
+                             </div>
+                             <Star className="w-5 h-5 text-orange-500" />
+                           </div>
+                           <h4 className="text-lg font-bold text-gray-800 mb-2">Luxury Experience</h4>
+                           <p className="text-gray-600 text-sm mb-4">5-star hotels, private transfers, guided tours</p>
+                           <div className="space-y-2 mb-4">
+                             <div className="flex items-center gap-2">
+                               <Hotel className="w-4 h-4 text-orange-500" />
+                               <span className="text-sm">5-star accommodation</span>
+                             </div>
+                             <div className="flex items-center gap-2">
+                               <Plane className="w-4 h-4 text-orange-500" />
+                               <span className="text-sm">Round-trip flights</span>
+                             </div>
+                             <div className="flex items-center gap-2">
+                               <MapPin className="w-4 h-4 text-orange-500" />
+                               <span className="text-sm">Private guided tours</span>
+                             </div>
+                           </div>
+                           <div className="flex items-center justify-between">
+                             <div className="text-2xl font-bold text-orange-600">₹85,000</div>
+                             <button 
+                               onClick={() => window.open('https://www.cleartrip.com/holidays/', '_blank')}
+                               className="bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition-colors"
+                             >
+                               View Details
+                             </button>
+                           </div>
+                         </motion.div>
+
+                         {/* Standard Package */}
+                         <motion.div 
+                           whileHover={{ y: -4, scale: 1.02 }}
+                           className="bg-white rounded-xl p-6 border border-gray-200 shadow-lg hover:shadow-xl transition-all duration-300"
+                         >
+                           <div className="flex items-center justify-between mb-4">
+                             <div className="bg-blue-500 text-white px-3 py-1 rounded-full text-sm font-medium">
+                               Popular
+                             </div>
+                             <ThumbsUp className="w-5 h-5 text-blue-500" />
+                           </div>
+                           <h4 className="text-lg font-bold text-gray-800 mb-2">Complete Package</h4>
+                           <p className="text-gray-600 text-sm mb-4">4-star hotels, group tours, meals included</p>
+                           <div className="space-y-2 mb-4">
+                             <div className="flex items-center gap-2">
+                               <Hotel className="w-4 h-4 text-blue-500" />
+                               <span className="text-sm">4-star accommodation</span>
+                             </div>
+                             <div className="flex items-center gap-2">
+                               <Plane className="w-4 h-4 text-blue-500" />
+                               <span className="text-sm">Round-trip flights</span>
+                             </div>
+                             <div className="flex items-center gap-2">
+                               <MapPin className="w-4 h-4 text-blue-500" />
+                               <span className="text-sm">Group guided tours</span>
+                             </div>
+                           </div>
+                           <div className="flex items-center justify-between">
+                             <div className="text-2xl font-bold text-blue-600">₹55,000</div>
+                             <button 
+                               onClick={() => window.open('https://www.cleartrip.com/holidays/', '_blank')}
+                               className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors"
+                             >
+                               View Details
+                             </button>
+                           </div>
+                         </motion.div>
+
+                         {/* Budget Package */}
+                         <motion.div 
+                           whileHover={{ y: -4, scale: 1.02 }}
+                           className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-6 border border-green-200 shadow-lg hover:shadow-xl transition-all duration-300"
+                         >
+                           <div className="flex items-center justify-between mb-4">
+                             <div className="bg-green-500 text-white px-3 py-1 rounded-full text-sm font-medium">
+                               Budget
+                             </div>
+                             <DollarSign className="w-5 h-5 text-green-500" />
+                           </div>
+                           <h4 className="text-lg font-bold text-gray-800 mb-2">Essential Travel</h4>
+                           <p className="text-gray-600 text-sm mb-4">3-star hotels, basic tours, great value</p>
+                           <div className="space-y-2 mb-4">
+                             <div className="flex items-center gap-2">
+                               <Hotel className="w-4 h-4 text-green-500" />
+                               <span className="text-sm">3-star accommodation</span>
+                             </div>
+                             <div className="flex items-center gap-2">
+                               <Plane className="w-4 h-4 text-green-500" />
+                               <span className="text-sm">Round-trip flights</span>
+                             </div>
+                             <div className="flex items-center gap-2">
+                               <MapPin className="w-4 h-4 text-green-500" />
+                               <span className="text-sm">Self-guided exploration</span>
+                             </div>
+                           </div>
+                           <div className="flex items-center justify-between">
+                             <div className="text-2xl font-bold text-green-600">₹35,000</div>
+                             <button 
+                               onClick={() => window.open('https://www.cleartrip.com/holidays/', '_blank')}
+                               className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors"
+                             >
+                               View Details
+                             </button>
+                           </div>
+                         </motion.div>
+                       </div>
+
+                       {/* Call to Action */}
+                       <div className="mt-8 text-center">
+                         <p className="text-gray-600 mb-4">Want a custom itinerary instead?</p>
+                         <button 
+                           onClick={handleShowItinerary}
+                           className="bg-orange-500 text-white px-6 py-3 rounded-lg hover:bg-orange-600 transition-colors font-medium"
+                         >
+                           Create Custom Itinerary
+                         </button>
+                       </div>
                      </motion.div>
                    )}
 
@@ -817,6 +1068,123 @@ export default function Home() {
                            </div>
                          )}
                        </div>
+
+                       {/* Book Hotels Button */}
+                       {flights.length > 0 && !showHotels && (
+                         <div className="mt-6 text-center">
+                           <motion.button
+                             whileHover={{ scale: 1.02, y: -2 }}
+                             whileTap={{ scale: 0.98 }}
+                             onClick={handleBookHotels}
+                             className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-8 py-3 rounded-xl font-semibold text-lg shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2 mx-auto"
+                           >
+                             <Hotel className="w-5 h-5" />
+                             Book Hotels
+                           </motion.button>
+                         </div>
+                       )}
+                     </motion.div>
+                   )}
+
+                   {/* Hotels Display */}
+                   {showHotels && hotels.length > 0 && (
+                     <motion.div 
+                       initial={{ opacity: 0, y: 30 }}
+                       animate={{ opacity: 1, y: 0 }}
+                       transition={{ duration: 0.6 }}
+                       className="mt-12"
+                     >
+                       <div className="text-center mb-6">
+                         <h3 className="text-xl font-bold text-gray-800 mb-2">🏨 Recommended Hotels in {plan?.chosenDestination}</h3>
+                         <p className="text-gray-600">
+                           Perfect accommodations for your stay | {startDate && endDate ? `${new Date(startDate).toLocaleDateString()} to ${new Date(endDate).toLocaleDateString()}` : 'Your selected dates'}
+                         </p>
+                       </div>
+
+                       <div className="space-y-4">
+                         {hotels.map((hotel, i) => (
+                           <div key={hotel.id} className="bg-white rounded-xl p-6 shadow-md border border-gray-200 hover:shadow-lg transition-shadow">
+                             <div className="flex gap-6">
+                               {/* Hotel Image */}
+                               <div className="w-32 h-24 flex-shrink-0">
+                                 <img 
+                                   src={hotel.image} 
+                                   alt={hotel.name}
+                                   className="w-full h-full object-cover rounded-lg"
+                                   onError={(e) => {
+                                     e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 200'%3E%3Crect width='300' height='200' fill='%23f3f4f6'/%3E%3Ctext x='150' y='100' text-anchor='middle' dy='0.3em' font-family='Arial' font-size='16' fill='%236b7280'%3EHotel Image%3C/text%3E%3C/svg%3E";
+                                   }}
+                                 />
+                               </div>
+
+                               {/* Hotel Details */}
+                               <div className="flex-1">
+                                 <div className="flex justify-between items-start mb-2">
+                                   <div>
+                                     <h4 className="text-lg font-bold text-gray-800">{hotel.name}</h4>
+                                     <div className="flex items-center gap-2 mb-1">
+                                       <div className="flex">
+                                         {[...Array(hotel.starRating)].map((_, idx) => (
+                                           <Star key={idx} className="w-4 h-4 fill-orange-400 text-orange-400" />
+                                         ))}
+                                       </div>
+                                       <span className="text-sm text-gray-600">{hotel.starRating} Star Hotel</span>
+                                     </div>
+                                     <div className="flex items-center gap-2 mb-2">
+                                       <div className="flex items-center gap-1">
+                                         <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                                         <span className="font-medium">{hotel.rating}</span>
+                                       </div>
+                                       <span className="text-sm text-gray-600">({hotel.reviews} reviews)</span>
+                                       <span className="text-sm text-gray-500">• {hotel.location}</span>
+                                     </div>
+                                   </div>
+                                   <div className="text-right">
+                                     <div className="text-xl font-bold text-blue-600">
+                                       ₹{hotel.price.toLocaleString()}
+                                     </div>
+                                     <div className="text-xs text-gray-600 mb-2">per night</div>
+                                     <button className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:shadow-lg transition-all duration-200">
+                                       Select Hotel
+                                     </button>
+                                   </div>
+                                 </div>
+
+                                 {/* Amenities */}
+                                 <div className="flex flex-wrap gap-2 mb-3">
+                                   {hotel.breakfastIncluded && (
+                                     <div className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full flex items-center gap-1">
+                                       ✓ Breakfast Included
+                                     </div>
+                                   )}
+                                   {hotel.freeWifi && (
+                                     <div className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full flex items-center gap-1">
+                                       📶 Free WiFi
+                                     </div>
+                                   )}
+                                   <div className="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded-full">
+                                     {hotel.cancellation}
+                                   </div>
+                                 </div>
+
+                                 {/* Top Amenities */}
+                                 <div className="flex flex-wrap gap-2">
+                                   {hotel.amenities.slice(0, 4).map((amenity: string, idx: number) => (
+                                     <span key={idx} className="text-xs text-gray-600 bg-gray-50 px-2 py-1 rounded">
+                                       {amenity}
+                                     </span>
+                                   ))}
+                                   {hotel.amenities.length > 4 && (
+                                     <span className="text-xs text-blue-600 cursor-pointer hover:underline">
+                                       +{hotel.amenities.length - 4} more
+                                     </span>
+                                   )}
+                                 </div>
+                               </div>
+                             </div>
+                           </div>
+                         ))}
+                       </div>
                      </motion.div>
                    )}
 
@@ -906,10 +1274,10 @@ export default function Home() {
            </div>
 
            {/* Right Panel - Chat Conversation */}
-           <div className="flex-1 lg:w-1/2 bg-white border-l border-gray-200">
+           <div className="w-full lg:w-2/5 bg-white/95 backdrop-blur-md border border-white/20 rounded-2xl">
              <div className="h-full flex flex-col">
                {/* Chat Header */}
-               <div className="bg-gradient-to-r from-orange-500 to-red-500 text-white p-4">
+               <div className="bg-gradient-to-r from-orange-500 to-red-500 text-white p-4 rounded-t-2xl">
                  <div className="flex items-center gap-3">
                    <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
                      <MessageCircle className="w-4 h-4" />
@@ -940,7 +1308,7 @@ export default function Home() {
                </div>
 
                {/* Chat Input Area */}
-               <div className="border-t border-gray-200 p-6 bg-gray-50">
+               <div className="border-t border-white/30 p-6 bg-white/90 backdrop-blur-sm rounded-b-2xl">
                  {/* Trip Description Input */}
                  {currentStep === "location" && (
                    <div className="space-y-4">
@@ -982,7 +1350,7 @@ export default function Home() {
                          <button
                            key={i}
                            onClick={() => setInput(prompt)}
-                           className="w-full text-left bg-white hover:bg-gray-50 px-4 py-3 rounded-xl text-gray-700 transition-colors border border-gray-200 hover:border-orange-300"
+                           className="w-full text-left bg-white/80 hover:bg-white/90 px-4 py-3 rounded-xl text-gray-700 transition-colors border border-white/20 hover:border-orange-300 backdrop-blur-sm"
                          >
                            {prompt}
                          </button>
@@ -1150,6 +1518,17 @@ export default function Home() {
                       setCurrentStep("location");
                     }} icon={<Edit className="w-4 h-4" />}>
                       Change of Plans
+                    </OptionButton>
+                  </div>
+                )}
+
+                {currentStep === "action_choice" && plan && (
+                  <div className="flex gap-2 justify-center overflow-x-auto pb-2">
+                    <OptionButton onClick={handleShowItinerary} icon={<BookOpen className="w-4 h-4" />}>
+                      Show Itinerary
+                    </OptionButton>
+                    <OptionButton onClick={handleExplorePackages} icon={<Star className="w-4 h-4" />}>
+                      Explore Packages
                     </OptionButton>
                   </div>
                 )}

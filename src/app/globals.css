@@ -56,10 +56,7 @@ body {
 
 /* Hero Section */
 .hero-section {
-  background: linear-gradient(135deg, rgba(255, 107, 53, 0.9), rgba(255, 71, 87, 0.8)), 
-              url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 600"><defs><linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:%23ff6b35;stop-opacity:0.1"/><stop offset="100%" style="stop-color:%23ff4757;stop-opacity:0.2"/></linearGradient></defs><rect width="1000" height="600" fill="url(%23bg)"/></svg>');
-  background-size: cover;
-  background-position: center;
+  background: transparent;
   min-height: 500px;
   position: relative;
 }
@@ -160,7 +157,7 @@ body {
   border-bottom: 1px solid #e5e7eb;
 }
 
-/* Destination Cards */
+/* Destination Cards - Enhanced for Real Images */
 .destination-card {
   position: relative;
   border-radius: 16px;
@@ -168,27 +165,17 @@ body {
   background: #ffffff;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
   transition: all 0.3s ease;
-  min-height: 250px;
+  min-height: 300px;
 }
 
 .destination-card:hover {
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
-  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+  transform: translateY(-6px) scale(1.01);
 }
 
+/* Remove the old ::before overlay to let real images show through */
 .destination-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(45deg, 
-    rgba(255, 107, 53, 0.8) 0%, 
-    rgba(55, 66, 250, 0.6) 50%, 
-    rgba(255, 71, 87, 0.8) 100%);
-  opacity: 0.9;
-  z-index: 1;
+  display: none;
 }
 
 .destination-card-content {
@@ -278,6 +265,29 @@ body {
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
+}
+
+/* Ken Burns Effect Animation */
+@keyframes ken-burns {
+  0% {
+    transform: scale(1) translate(0, 0);
+  }
+  25% {
+    transform: scale(1.08) translate(-2%, -1%);
+  }
+  50% {
+    transform: scale(1.12) translate(1%, -2%);
+  }
+  75% {
+    transform: scale(1.05) translate(-1%, 1%);
+  }
+  100% {
+    transform: scale(1.1) translate(1%, 0%);
+  }
+}
+
+.animate-ken-burns {
+  animation: ken-burns 20s ease-in-out infinite alternate;
 }
 
 /* Error States */
